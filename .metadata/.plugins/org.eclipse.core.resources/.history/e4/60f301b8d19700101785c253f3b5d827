@@ -1,0 +1,44 @@
+package com.klef.dev.Services;
+
+import org.springframework.stereotype.Service;
+import com.klef.dev.Entity.User;
+import com.klef.dev.Repository.UserRepository;
+
+import java.util.Optional;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    // Register user with email uniqueness check
+    public User register(User user) {
+        if (user.getPassword() == null || user.getPassword().trim().isEmpty()) {
+            throw new RuntimeException("Password cannot be empty!");
+        }
+
+        Optional<User> existingUser = userRepository.findByEmail(user.getEmail());
+        if (existingUser.isPresent()) {
+            throw new RuntimeException("Email is already registered!");
+        }
+        return userRepository.save(user);
+    }
+
+    // Login validation
+    public Optional<User> login(String email, String password) {
+        return userRepository.findByEmail(email)
+                .filter(u -> u.getPassword() != null && u.getPassword().equals(password));
+    }
+
+    // Update user profile
+    public User updateProfile(User user) {
+        if (user.getId() == null) {
+            throw new RuntimeException("User ID cannot be null!");
+        }
+        return userRepository.save(user);
+    }
+}

@@ -1,0 +1,33 @@
+package com.klef.dev.Services;
+
+import org.springframework.stereotype.Service;
+import com.klef.dev.Entity.User;
+import com.klef.dev.Repository.UserRepository;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    public User updateProfile(User user) {
+        User existingUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        existingUser.setName(user.getName());
+        existingUser.setEmail(user.getEmail());
+        existingUser.setPhone(user.getPhone());
+        existingUser.setAddress(user.getAddress());
+        existingUser.setCity(user.getCity());
+        existingUser.setState(user.getState());
+        existingUser.setZipCode(user.getZipCode());
+        existingUser.setBio(user.getBio());
+        existingUser.setPetPreference(user.getPetPreference());
+        existingUser.setExperience(user.getExperience());
+
+        return userRepository.save(existingUser);
+    }
+}
