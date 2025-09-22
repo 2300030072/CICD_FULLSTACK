@@ -1,0 +1,25 @@
+package com.klef.dev.Controller;
+
+import org.springframework.web.bind.annotation.*;
+
+import com.klef.dev.Entity.Pet;
+import com.klef.dev.Services.PetService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/pets")
+@CrossOrigin(origins = "http://localhost:5173")
+public class PetController {
+    private final PetService petService;
+    public PetController(PetService petService) { this.petService = petService; }
+
+    @GetMapping
+    public List<Pet> getAllPets() { return petService.getAllPets(); }
+
+    @GetMapping("/type/{type}")
+    public List<Pet> getPetsByType(@PathVariable String type) {
+        return petService.getPetsByType(type);
+    }
+}
+

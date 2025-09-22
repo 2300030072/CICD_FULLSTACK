@@ -7,6 +7,7 @@ function Login({ onLogin }) {
     password: ''
   })
   const navigate = useNavigate()
+  const apiUrl = import.meta.env.VITE_API_URL
 
   const handleChange = (e) => {
     setFormData({
@@ -15,27 +16,35 @@ function Login({ onLogin }) {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    // Simple validation
+
     if (!formData.email || !formData.password) {
       alert('Please fill in all fields')
       return
     }
 
-    // Mock login - no database check, just accept any credentials
-    const userData = {
-      email: formData.email,
-      name: formData.email.split('@')[0], // Use part before @ as name
-      loginTime: new Date().toLocaleString()
+    try {
+      const res = await fetch(`${apiUrl}/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (res.status === 401) {
+        alert('Invalid email or password')
+        return
+      }
+
+      const user = await res.json()
+      alert(`Welcome back, ${user.name}!`)
+      
+      onLogin(user)  // save user info in App or context
+      navigate('/dashboard')
+    } catch (err) {
+      console.error(err)
+      alert('Error during login. Please try again.')
     }
-    
-    // Call the login function passed from App
-    onLogin(userData)
-    
-    // Redirect to dashboard
-    navigate('/dashboard')
   }
 
   return (
@@ -55,7 +64,6 @@ function Login({ onLogin }) {
               placeholder="Enter your email"
             />
           </div>
-          
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -68,12 +76,10 @@ function Login({ onLogin }) {
               placeholder="Enter your password"
             />
           </div>
-          
           <button type="submit" className="btn btn-primary btn-full">
             Login
           </button>
         </form>
-        
         <div className="form-footer">
           <p>Don't have an account? <Link to="/register">Register here</Link></p>
         </div>

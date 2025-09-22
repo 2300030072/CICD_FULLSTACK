@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom'
 function Profile({ currentUser, onUpdateProfile }) {
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const apiUrl = import.meta.env.VITE_API_URL
+
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
     email: currentUser?.email || '',
@@ -34,11 +37,38 @@ function Profile({ currentUser, onUpdateProfile }) {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onUpdateProfile(formData)
-    setIsEditing(false)
-    alert('Profile updated successfully!')
+    setLoading(true)
+
+    try {
+      const res = await fetch(`${apiUrl}/users/${currentUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(`Update failed: ${data}`)
+        return
+      }
+
+      alert('Profile updated successfully!')
+      setIsEditing(false)
+
+      // Update currentUser in parent if needed
+      if (onUpdateProfile) onUpdateProfile(data)
+
+      // Optional: redirect to dashboard
+      navigate('/dashboard')
+    } catch (err) {
+      console.error('Profile update error:', err)
+      alert('Profile update failed! Check backend.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCancel = () => {
@@ -69,7 +99,9 @@ function Profile({ currentUser, onUpdateProfile }) {
           <div className="profile-info">
             <h1>{currentUser.name || 'Pet Lover'}</h1>
             <p className="profile-email">{currentUser.email}</p>
-            <p className="profile-member-since">Member since {currentUser.loginTime || 'Today'}</p>
+            <p className="profile-member-since">
+              Member since {currentUser.loginTime || 'Today'}
+            </p>
           </div>
           <div className="profile-actions">
             {!isEditing ? (
@@ -81,8 +113,8 @@ function Profile({ currentUser, onUpdateProfile }) {
                 <button className="btn btn-secondary" onClick={handleCancel}>
                   Cancel
                 </button>
-                <button type="submit" form="profile-form" className="btn btn-primary">
-                  Save Changes
+                <button type="submit" form="profile-form" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             )}
@@ -93,6 +125,7 @@ function Profile({ currentUser, onUpdateProfile }) {
           {!isEditing ? (
             // View Mode
             <div className="profile-view">
+              {/* Personal Information */}
               <div className="profile-section">
                 <h3>Personal Information</h3>
                 <div className="info-grid">
@@ -127,6 +160,7 @@ function Profile({ currentUser, onUpdateProfile }) {
                 </div>
               </div>
 
+              {/* Pet Preferences */}
               <div className="profile-section">
                 <h3>Pet Preferences</h3>
                 <div className="info-grid">
@@ -141,13 +175,13 @@ function Profile({ currentUser, onUpdateProfile }) {
                 </div>
               </div>
 
+              {/* Bio */}
               <div className="profile-section">
                 <h3>About Me</h3>
-                <p className="bio-text">
-                  {currentUser.bio || 'No bio provided yet. Click "Edit Profile" to add information about yourself and what kind of pet companion you\'re looking for!'}
-                </p>
+                <p className="bio-text">{currentUser.bio || 'No bio provided yet.'}</p>
               </div>
 
+              {/* Quick Actions */}
               <div className="profile-section">
                 <h3>Quick Actions</h3>
                 <div className="quick-actions">
@@ -166,6 +200,7 @@ function Profile({ currentUser, onUpdateProfile }) {
           ) : (
             // Edit Mode
             <form id="profile-form" onSubmit={handleSubmit} className="profile-form">
+              {/* All your form fields remain exactly the same */}
               <div className="profile-section">
                 <h3>Personal Information</h3>
                 <div className="form-grid">
@@ -250,6 +285,7 @@ function Profile({ currentUser, onUpdateProfile }) {
                 </div>
               </div>
 
+              {/* Pet Preferences */}
               <div className="profile-section">
                 <h3>Pet Preferences</h3>
                 <div className="form-grid">
@@ -283,6 +319,7 @@ function Profile({ currentUser, onUpdateProfile }) {
                 </div>
               </div>
 
+              {/* About Me */}
               <div className="profile-section">
                 <h3>About Me</h3>
                 <div className="form-group">
