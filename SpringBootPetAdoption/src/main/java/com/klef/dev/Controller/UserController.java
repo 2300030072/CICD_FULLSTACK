@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 package com.klef.dev.Controller;
 
 import com.klef.dev.Entity.User;
@@ -107,3 +108,5 @@ public class UserController {
         }
     }
 }
+=======
+>>>>>>> aswini

@@ -1,0 +1,5 @@
+package com.klef.dev.Repository;
+
+public interface UserRepository {
+
+}
