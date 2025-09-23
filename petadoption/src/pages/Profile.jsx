@@ -1,46 +1,90 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 function Profile({ currentUser, onUpdateProfile }) {
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [fetchingUser, setFetchingUser] = useState(false)
+  const [initialLoad, setInitialLoad] = useState(true)
   const apiUrl = import.meta.env.VITE_API_URL
 
   const [formData, setFormData] = useState({
-    name: currentUser?.name || '',
-    email: currentUser?.email || '',
-    phone: currentUser?.phone || '',
-    address: currentUser?.address || '',
-    city: currentUser?.city || '',
-    state: currentUser?.state || '',
-    zipCode: currentUser?.zipCode || '',
-    bio: currentUser?.bio || '',
-    petPreference: currentUser?.petPreference || 'any',
-    experience: currentUser?.experience || 'beginner'
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    bio: '',
+    petPreference: 'any',
+    experience: 'beginner'
   })
 
-  if (!currentUser) {
-    return (
-      <div className="page-container">
-        <div className="profile-container">
-          <h2>Please log in to view your profile</h2>
-        </div>
-      </div>
-    )
+  const updateFormFromUser = (user) => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        city: user.city || '',
+        state: user.state || '',
+        zipCode: user.zipCode || '',
+        bio: user.bio || '',
+        petPreference: user.petPreference || 'any',
+        experience: user.experience || 'beginner'
+      })
+    }
   }
+
+  // Initial redirect check
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoad(false)
+      if (!currentUser) navigate('/login')
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [currentUser, navigate])
+
+  // Update formData whenever currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      updateFormFromUser(currentUser)
+    }
+  }, [currentUser])
+
+  // Fetch latest user info from backend
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (!currentUser?.id) return
+      setFetchingUser(true)
+      try {
+        const res = await fetch(`${apiUrl}/users/${currentUser.id}`)
+        if (res.ok) {
+          const freshUser = await res.json()
+          updateFormFromUser(freshUser)
+          onUpdateProfile(freshUser) // update global
+        }
+      } catch (err) {
+        console.error('Error fetching updated user:', err)
+      } finally {
+        setFetchingUser(false)
+      }
+    }
+    if (currentUser?.id && !initialLoad) {
+      fetchUser()
+    }
+  }, [apiUrl, currentUser?.id, initialLoad, onUpdateProfile])
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     setLoading(true)
-
     try {
       const res = await fetch(`${apiUrl}/users/${currentUser.id}`, {
         method: 'PUT',
@@ -48,44 +92,38 @@ function Profile({ currentUser, onUpdateProfile }) {
         body: JSON.stringify(formData)
       })
 
-      const data = await res.json()
-
       if (!res.ok) {
-        alert(`Update failed: ${data}`)
+        const errData = await res.text()
+        alert(`Update failed: ${errData}`)
         return
       }
 
-      alert('Profile updated successfully!')
+      const updatedUser = await res.json()
+
+      // ✅ update global + persist in localStorage
+      onUpdateProfile(updatedUser)
+      localStorage.setItem("user", JSON.stringify(updatedUser))
+
+      // ✅ update local form state
+      updateFormFromUser(updatedUser)
+
       setIsEditing(false)
-
-      // Update currentUser in parent if needed
-      if (onUpdateProfile) onUpdateProfile(data)
-
-      // Optional: redirect to dashboard
-      navigate('/dashboard')
+      alert('Profile updated successfully!')
     } catch (err) {
-      console.error('Profile update error:', err)
-      alert('Profile update failed! Check backend.')
+      alert('Profile update failed! Try again.')
     } finally {
       setLoading(false)
     }
   }
 
   const handleCancel = () => {
-    setFormData({
-      name: currentUser?.name || '',
-      email: currentUser?.email || '',
-      phone: currentUser?.phone || '',
-      address: currentUser?.address || '',
-      city: currentUser?.city || '',
-      state: currentUser?.state || '',
-      zipCode: currentUser?.zipCode || '',
-      bio: currentUser?.bio || '',
-      petPreference: currentUser?.petPreference || 'any',
-      experience: currentUser?.experience || 'beginner'
-    })
+    updateFormFromUser(currentUser)
     setIsEditing(false)
   }
+
+  if (initialLoad) return <p>Loading...</p>
+  if (!currentUser) return null
+  if (fetchingUser && !formData.email) return <p>Loading profile...</p>
 
   return (
     <div className="page-container">
@@ -93,15 +131,15 @@ function Profile({ currentUser, onUpdateProfile }) {
         <div className="profile-header">
           <div className="profile-avatar">
             <div className="avatar-circle">
-              {(currentUser.name || currentUser.email).charAt(0).toUpperCase()}
+              {(formData.name || formData.email || 'U').charAt(0).toUpperCase()}
             </div>
           </div>
           <div className="profile-info">
-            <h1>{currentUser.name || 'Pet Lover'}</h1>
-            <p className="profile-email">{currentUser.email}</p>
-            <p className="profile-member-since">
-              Member since {currentUser.loginTime || 'Today'}
-            </p>
+            <h1>{formData.name || 'Pet Lover'}</h1>
+            <p className="profile-email">{formData.email}</p>
+            {currentUser.role === 'ADMIN' && (
+              <p className="admin-badge">Admin</p>
+            )}
           </div>
           <div className="profile-actions">
             {!isEditing ? (
@@ -110,232 +148,101 @@ function Profile({ currentUser, onUpdateProfile }) {
               </button>
             ) : (
               <div className="edit-actions">
-                <button className="btn btn-secondary" onClick={handleCancel}>
+                <button className="btn btn-secondary" onClick={handleCancel} disabled={loading}>
                   Cancel
                 </button>
-                <button type="submit" form="profile-form" className="btn btn-primary" disabled={loading}>
+                <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             )}
+            {currentUser.role === 'ADMIN' && !isEditing && (
+              <button className="btn btn-warning" onClick={() => navigate('/admin-dashboard')}>
+                Go to Admin Dashboard
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Personal Info */}
         <div className="profile-content">
-          {!isEditing ? (
-            // View Mode
-            <div className="profile-view">
-              {/* Personal Information */}
-              <div className="profile-section">
-                <h3>Personal Information</h3>
-                <div className="info-grid">
-                  <div className="info-item">
-                    <label>Full Name:</label>
-                    <span>{currentUser.name || 'Not provided'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Email:</label>
-                    <span>{currentUser.email}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Phone:</label>
-                    <span>{currentUser.phone || 'Not provided'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Address:</label>
-                    <span>{currentUser.address || 'Not provided'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>City:</label>
-                    <span>{currentUser.city || 'Not provided'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>State:</label>
-                    <span>{currentUser.state || 'Not provided'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Zip Code:</label>
-                    <span>{currentUser.zipCode || 'Not provided'}</span>
-                  </div>
+          <div className="profile-section">
+            <h3>Personal Information</h3>
+            <div className="info-grid">
+              {[
+                { field: 'name', label: 'Name', type: 'text' },
+                { field: 'email', label: 'Email', type: 'email' },
+                { field: 'phone', label: 'Phone', type: 'tel' },
+                { field: 'address', label: 'Address', type: 'text' },
+                { field: 'city', label: 'City', type: 'text' },
+                { field: 'state', label: 'State', type: 'text' },
+                { field: 'zipCode', label: 'Zip Code', type: 'text' }
+              ].map(({ field, label, type }) => (
+                <div className="info-item" key={field}>
+                  <label>{label}:</label>
+                  {isEditing ? (
+                    <input
+                      type={type}
+                      name={field}
+                      value={formData[field] || ''}
+                      onChange={handleChange}
+                    />
+                  ) : (
+                    <span>{formData[field] || 'Not provided'}</span>
+                  )}
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              {/* Pet Preferences */}
-              <div className="profile-section">
-                <h3>Pet Preferences</h3>
-                <div className="info-grid">
-                  <div className="info-item">
-                    <label>Preferred Pet Type:</label>
-                    <span className="capitalize">{currentUser.petPreference || 'Any'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Experience Level:</label>
-                    <span className="capitalize">{currentUser.experience || 'Beginner'}</span>
-                  </div>
-                </div>
+          {/* Pet Preferences */}
+          <div className="profile-section">
+            <h3>Pet Preferences</h3>
+            <div className="info-grid">
+              <div className="info-item">
+                <label>Preferred Pet:</label>
+                {isEditing ? (
+                  <select name="petPreference" value={formData.petPreference} onChange={handleChange}>
+                    <option value="any">Any</option>
+                    <option value="dog">Dog</option>
+                    <option value="cat">Cat</option>
+                    <option value="small">Small Pets</option>
+                    <option value="bird">Bird</option>
+                    <option value="rabbit">Rabbit</option>
+                  </select>
+                ) : (
+                  <span>{formData.petPreference || 'Any'}</span>
+                )}
               </div>
-
-              {/* Bio */}
-              <div className="profile-section">
-                <h3>About Me</h3>
-                <p className="bio-text">{currentUser.bio || 'No bio provided yet.'}</p>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="profile-section">
-                <h3>Quick Actions</h3>
-                <div className="quick-actions">
-                  <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>
-                    Browse Pets
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => alert('Feature coming soon!')}>
-                    View Applications
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => alert('Feature coming soon!')}>
-                    My Favorites
-                  </button>
-                </div>
+              <div className="info-item">
+                <label>Experience:</label>
+                {isEditing ? (
+                  <select name="experience" value={formData.experience} onChange={handleChange}>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                ) : (
+                  <span>{formData.experience || 'Beginner'}</span>
+                )}
               </div>
             </div>
-          ) : (
-            // Edit Mode
-            <form id="profile-form" onSubmit={handleSubmit} className="profile-form">
-              {/* All your form fields remain exactly the same */}
-              <div className="profile-section">
-                <h3>Personal Information</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label htmlFor="name">Full Name</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="email">Email Address</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Enter your email"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="phone">Phone Number</label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="Enter your phone number"
-                    />
-                  </div>
-                  <div className="form-group full-width">
-                    <label htmlFor="address">Address</label>
-                    <input
-                      type="text"
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      placeholder="Enter your street address"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="city">City</label>
-                    <input
-                      type="text"
-                      id="city"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      placeholder="Enter your city"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="state">State</label>
-                    <input
-                      type="text"
-                      id="state"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
-                      placeholder="Enter your state"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="zipCode">Zip Code</label>
-                    <input
-                      type="text"
-                      id="zipCode"
-                      name="zipCode"
-                      value={formData.zipCode}
-                      onChange={handleChange}
-                      placeholder="Enter your zip code"
-                    />
-                  </div>
-                </div>
-              </div>
+          </div>
 
-              {/* Pet Preferences */}
-              <div className="profile-section">
-                <h3>Pet Preferences</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label htmlFor="petPreference">Preferred Pet Type</label>
-                    <select
-                      id="petPreference"
-                      name="petPreference"
-                      value={formData.petPreference}
-                      onChange={handleChange}
-                    >
-                      <option value="any">Any</option>
-                      <option value="dog">Dogs</option>
-                      <option value="cat">Cats</option>
-                      <option value="rabbit">Small Pets</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="experience">Experience Level</label>
-                    <select
-                      id="experience"
-                      name="experience"
-                      value={formData.experience}
-                      onChange={handleChange}
-                    >
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="experienced">Experienced</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* About Me */}
-              <div className="profile-section">
-                <h3>About Me</h3>
-                <div className="form-group">
-                  <label htmlFor="bio">Bio</label>
-                  <textarea
-                    id="bio"
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleChange}
-                    rows="4"
-                    placeholder="Tell us about yourself, your living situation, and what kind of pet companion you're looking for..."
-                  />
-                </div>
-              </div>
-            </form>
-          )}
+          {/* About Me */}
+          <div className="profile-section">
+            <h3>About Me</h3>
+            {isEditing ? (
+              <textarea
+                name="bio"
+                value={formData.bio}
+                onChange={handleChange}
+                placeholder="Tell us about yourself..."
+              />
+            ) : (
+              <p>{formData.bio || 'No bio provided yet.'}</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

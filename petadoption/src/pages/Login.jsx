@@ -6,14 +6,16 @@ function Login({ onLogin }) {
     email: '',
     password: ''
   })
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const apiUrl = import.meta.env.VITE_API_URL
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value.trim() // Remove whitespace that might cause issues
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -24,26 +26,62 @@ function Login({ onLogin }) {
       return
     }
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      alert('Please enter a valid email address')
+      return
+    }
+
+    setLoading(true)
+
     try {
+      console.log('Attempting login with email:', formData.email)
+      
       const res = await fetch(`${apiUrl}/users/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.email.toLowerCase(), // Ensure email is lowercase
+          password: formData.password
+        })
       })
 
+      console.log('Login response status:', res.status)
+
       if (res.status === 401) {
-        alert('Invalid email or password')
+        alert('Invalid email or password. Please check your credentials.')
+        return
+      }
+
+      if (!res.ok) {
+        const errorData = await res.text()
+        console.error('Login failed:', errorData)
+        alert('Login failed. Please try again.')
         return
       }
 
       const user = await res.json()
-      alert(`Welcome back, ${user.name}!`)
+      console.log('Login successful, user data:', user)
       
-      onLogin(user)  // save user info in App or context
+      // Store user data in localStorage for persistence
+      localStorage.setItem('currentUser', JSON.stringify(user))
+      
+      alert(`Welcome back, ${user.name || user.email}!`)
+      
+      // Update the global state with user data
+      onLogin(user)
+      
+      // Navigate to dashboard
       navigate('/dashboard')
+      
     } catch (err) {
-      console.error(err)
-      alert('Error during login. Please try again.')
+      console.error('Login error:', err)
+      alert('Error during login. Please check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -62,6 +100,14 @@ function Login({ onLogin }) {
               onChange={handleChange}
               required
               placeholder="Enter your email"
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '16px',
+                border: '1px solid #ddd',
+                borderRadius: '4px'
+              }}
+              disabled={loading}
             />
           </div>
           <div className="form-group">
@@ -74,10 +120,26 @@ function Login({ onLogin }) {
               onChange={handleChange}
               required
               placeholder="Enter your password"
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '16px',
+                border: '1px solid #ddd',
+                borderRadius: '4px'
+              }}
+              disabled={loading}
             />
           </div>
-          <button type="submit" className="btn btn-primary btn-full">
-            Login
+          <button 
+            type="submit" 
+            className="btn btn-primary btn-full"
+            disabled={loading}
+            style={{
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
         <div className="form-footer">

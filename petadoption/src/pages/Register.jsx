@@ -62,7 +62,7 @@ function Register() {
       navigate('/'); // go to Home page
     } catch (err) {
       console.error('Fetch error:', err);
-      alert('Registration failed! Check backend.');
+      alert('Email Already Exit.');
     } finally {
       setLoading(false);
     }
