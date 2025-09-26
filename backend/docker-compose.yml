@@ -1,0 +1,38 @@
+services:
+  mysqldb:
+    container_name: mysql-db
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: docker
+      MYSQL_DATABASE: petadoptiondb
+      # MYSQL_USER: klu
+      # MYSQL_PASSWORD: klu
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql   # volume added here
+
+  backend:
+    container_name: springboot
+    build:
+      context: ./backend
+      dockerfile: ../PET_FULL_STACK/backend.Dockerfile
+    ports:
+      - "8080:8081"
+    depends_on:
+      - mysqldb
+    restart: on-failure
+
+  frontend:
+    container_name: react
+    build:
+      context: ./petAdoption
+      dockerfile: ../PET_FULL_STACK/frontend.Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+# Declare volumes at the bottom
+volumes:
+  mysql-data:
